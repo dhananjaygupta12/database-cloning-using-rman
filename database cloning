@@ -1,0 +1,187 @@
+Database CLONING USING RMAN
+
+
+PRIMARY SIDE -------------
+
+
+run     -------- take rman backup
+{
+allocate channel ch1 device type disk;
+crosscheck archivelog all;
+backup as compressed backupset database format '/home/oracle/rman/Fullback_%T_%U'
+plus archivelog format '/home/oracle/rman/Archive_%T_%U';
+backup current controlfile format '/home/oracle/rman/Controlback_%T_%U';
+release channel ch1;
+}
+
+crosscheck verify backup loaction-------
+
+
+[oracle@PRIMARY ~]$ cd rman/
+[oracle@PRIMARY rman]$ ll
+total 396640
+-rw-r-----. 1 oracle oinstall  90439168 Nov 18 05:54 Archive_20241118_0l3adpat_1_1
+-rw-r-----. 1 oracle oinstall    203776 Nov 18 05:55 Archive_20241118_0n3adpf6_1_1
+-rw-r-----. 1 oracle oinstall  10682368 Nov 18 05:55 Controlback_20241118_0o3adpf8_1_1
+-rw-r-----. 1 oracle oinstall 304832512 Nov 18 05:55 Fullback_20241118_0m3adpc3_1_1
+
+
+tarsfer take backup in target location firstly same director/home/oracle/rmany create in target server -------
+
+scp * oracle@192.168.29.192:/home/oracle/rman -----------  transfer the backup in target location cross verify 
+
+[oracle@TESTDB rman]$ ll
+total 396640
+-rw-r-----. 1 oracle oinstall  90439168 Nov 18 06:11 Archive_20241118_0l3adpat_1_1
+-rw-r-----. 1 oracle oinstall    203776 Nov 18 06:11 Archive_20241118_0n3adpf6_1_1
+-rw-r-----. 1 oracle oinstall  10682368 Nov 18 06:11 Controlback_20241118_0o3adpf8_1_1
+-rw-r-----. 1 oracle oinstall 304832512 Nov 18 06:12 Fullback_20241118_0m3adpc3_1_1
+[oracle@TESTDB rman]$
+
+SQL> create pfile from spfile;
+
+
+transfer the spfile to target server ----------
+
+scp initPRIMARY.ora oracle@192.168.29.192:$ORACLE_HOME/dbs
+
+
+Going in tareget server
+
+
+[oracle@TESTDB ~]$ cat  /etc/oratab
+
+TESTDB:/u01/app/oracle/product/19.0.0/dbhome_1:N
+
+
+
+edit in spfile from target server replace PRIMARY to TESTDB ------------
+
+
+
+put these entry manually because in PRIMARY database data loction is differenet but restore datafile in target location is differenet
+
+
+*.db_file_name_convert='/u01/app/oracle/oradata/PRIMARY','/u01/app/oracle/oradata/TESTDB'
+*.log_file_name_convert='/u01/app/oracle/oradata/PRIMARY','/u01/app/oracle/oradata/TESTDB'
+
+
+TESTDB.__data_transfer_cache_size=0
+TESTDB.__db_cache_size=146800640
+TESTDB.__inmemory_ext_roarea=0
+TESTDB.__inmemory_ext_rwarea=0
+TESTDB.__java_pool_size=4194304
+TESTDB.__large_pool_size=4194304
+TESTDB.__oracle_base='/u01/app/oracle'#ORACLE_BASE set from environment
+TESTDB.__pga_aggregate_target=306184192
+TESTDB.__sga_target=406847488
+TESTDB.__shared_io_pool_size=12582912
+TESTDB.__shared_pool_size=226492416
+TESTDB.__streams_pool_size=0
+TESTDB.__unified_pga_pool_size=0
+*.audit_file_dest='/u01/app/oracle/admin/TESTDB/adump'
+*.audit_trail='db'
+*.compatible='19.0.0'
+*.control_files='/u01/app/oracle/oradata/TESTDB/control01.ctl','/u01/app/oracle/fast_recovery_area/TESTDB/control02.ctl'
+*.db_block_size=8192
+*.db_name='TESTDB'
+*.db_recovery_file_dest='/u01/app/oracle/fast_recovery_area'
+*.db_recovery_file_dest_size=8256m
+*.diagnostic_dest='/u01/app/oracle'
+*.dispatchers='(PROTOCOL=TCP) (SERVICE=TESTDBXDB)'
+*.local_listener='LISTENER_TESTDB'
+*.memory_target=678m
+*.nls_language='AMERICAN'
+*.nls_territory='AMERICA'
+*.open_cursors=300
+*.processes=300
+*.remote_login_passwordfile='EXCLUSIVE'
+*.undo_tablespace='UNDOTBS1'
+*.db_file_name_convert='/u01/app/oracle/oradata/PRIMARY','/u01/app/oracle/oradata/TESTDB'
+*.log_file_name_convert='/u01/app/oracle/oradata/PRIMARY','/u01/app/oracle/oradata/TESTDB'
+
+SQL> startup nomount pfile='initTESTDB.ora';
+ORACLE instance started.
+
+Total System Global Area  713027608 bytes
+Fixed Size                  8900632 bytes
+Variable Size             541065216 bytes
+Database Buffers          159383552 bytes
+Redo Buffers                3678208 bytes
+SQL> create spfile from pfile;
+
+File created.
+
+SQL> shut immediate;
+ORA-01507: database not mounted
+
+
+ORACLE instance shut down.
+
+SQL> SQL>
+SQL>
+SQL>
+SQL> startup nomount;
+ORACLE instance started.
+
+Total System Global Area  713027608 bytes
+Fixed Size                  8900632 bytes
+Variable Size             541065216 bytes
+Database Buffers          159383552 bytes
+Redo Buffers                3678208 bytes
+SQL>
+SQL>
+SQL>
+SQL> show parameter spfile;
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+spfile                               string      /u01/app/oracle/product/19.0.0
+                                                 /dbhome_1/dbs/spfileTESTDB.ora
+SQL>
+
+
+
+[oracle@TESTDB dbs]$ rman auxiliary /
+
+Recovery Manager: Release 19.0.0.0.0 - Production on Mon Nov 18 06:50:26 2024
+Version 19.3.0.0.0
+
+Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
+
+connected to auxiliary database: TESTDB (not mounted)
+
+restore database in nofilecheck name because in PRIMARY server and target location data location is different 
+
+RMAN> DUPLICATE DATABASE TO TESTDB BACKUP LOCATION '/home/oracle/rman/' NOFILENAMECHECK;     
+
+  
+ 
+ restore complete -------  cross verify all location
+ 
+ QL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+TESTDB    READ WRITE
+
+SQL>
+SQL>
+SQL> select name from v$datafile;
+
+NAME
+--------------------------------------------------------------------------------
+/u01/app/oracle/oradata/TESTDB/system01.dbf
+/u01/app/oracle/oradata/TESTDB/sysaux01.dbf
+/u01/app/oracle/oradata/TESTDB/undotbs01.dbf
+/u01/app/oracle/oradata/TESTDB/users01.dbf
+
+SQL> select name from v$controlfile;
+
+NAME
+--------------------------------------------------------------------------------
+/u01/app/oracle/oradata/TESTDB/control01.ctl
+/u01/app/oracle/fast_recovery_area/TESTDB/control02.ctl
+
+
+
